@@ -1,3 +1,5 @@
 config.json
 logs.json
 virtualenv
+.idea
+__pycache__
