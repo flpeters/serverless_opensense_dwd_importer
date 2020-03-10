@@ -1,0 +1,45 @@
+.container-1 {
+    padding-top: 25px;
+    background: #EAEAEB;
+}
+
+.container-2 {
+    padding-top: 25px;
+    background: #EAEAEB;
+}
+
+#actionList {
+    min-height: 300px;
+    max-height: 350px;
+    overflow: auto;
+    background-color: white;
+    outline-style: solid;
+    outline-color: black;
+    margin-left: 25px;
+    margin-right: 25px;
+    margin-bottom: 20px;
+}
+
+h1 {
+    color: orange;
+    text-align: center;
+}
+
+#deployedActionsHeader {
+    text-align: center;
+}
+
+h3 {
+    color: orange;
+    text-align: center;
+}
+
+#displayWrapper {
+    overflow: hidden;
+}
+
+#barChart {
+    background-color: wheat;
+    border-radius: 6px;
+    box-shadow: 0 3rem 5rem -2rem rgba(0, 0, 0, 0.6);
+}

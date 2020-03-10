@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ServerLess Monitor</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+    <script type="text/javascript"
+            src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.1.6/Chart.bundle.min.js"></script>
+    <script src="script.js"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+          integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+</head>
+<body>
+<div id="displayWrapper">
+    <div class="container-0">
+        <div class="row">
+            <div class="col-md-12">
+                <div id="header"><h1>Debugging Monitor OpenSense.network ServerLess alpha 0.1</h1></div>
+            </div>
+        </div>
+    </div>
+    <div class="container-1">
+        <div class="row">
+            <div class="col-md-1"></div>
+            <div class="col-md-12 col-lg-4">
+                <canvas id="barChart"></canvas>
+            </div>
+            <div class="col-md-1"></div>
+            <div class="col-md-4">
+                <div id="debuggingStats">
+                    <h2>Statistics:</h2>
+                    <ul>
+                        <li>Aimed new values in the last 15 seconds: <label id="aimedValueCount">0</label></li>
+                        <li>Reached values in the last 15 seconds: <label id="reachedValueCount">0</label></li>
+                        <li>Approx hourly values based on measured avg aimed Values: <label id="hourlyValues">0</label>
+                        </li>
+                        <li>Action Counter (Started / Aimed handle value actions): <label id="actionCount">0</label> /
+                            <label id="actionExpected">0</label></li>
+                        <li>Last Import Start Time: <label id="startTime">0</label></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="col-md-2"></div>
+        </div>
+    </div>
+    <div class="container-2">
+        <div class="row">
+            <div class="col-md-1"></div>
+            <div class="col-md-4">
+                <div>
+                    <label><input id="pauseLogs" type="checkbox" name="pauseLogs">
+                        Pause [Monitor calls handle config action (avg 30 ms warm) once in 15 seconds when not paused]
+                    </label>
+                    <h2>Monitor Logs:</h2>
+                    <div id="monitorLogs">
+
+                    </div>
+                    <div id="loggerState">
+
+                    </div>
+                    <h2>ActionList Logs:</h2>
+                    <div id="actionListLogs">
+
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div id="consoleTools">
+                    <div id="deploymentSection">
+                        <h2>Deployment:</h2>
+                        <button id="deployActionsBtn" class="btn btn-warning" onclick="deployActions()">Deploy Actions
+                        </button>
+                        <button class="btn btn-warning" onclick="deleteActions()">Delete Actions</button>
+                        <button class="btn btn-warning" onclick="clearLogs()">Clear Logs</button>
+                        <button class="btn btn-warning" onclick="clearMongo()">Clear MongoDB</button>
+                        <fieldset>
+                            <h5>Deployment type:</h5>
+                            <input type="radio" id="local" checked="checked" name="Deployment" value="LOCAL">
+                            <label for="local"> LOCAL</label>
+                            <input type="radio" id="ibm" name="Deployment" value="IBM">
+                            <label for="ibm"> IBM</label>
+                            <input type="radio" id="remote" name="Deployment" value="REMOTE">
+                            <label for="remote"> REMOTE</label>
+                        </fieldset>
+                        <div>
+                            <input id="checkBox" type="checkbox" name="freshdeploy"> Fresh Deployment
+                        </div>
+                    </div>
+                    <h2>Import:</h2>
+                    <div>
+                        Import Calls
+                        <input id="importCalls" type="number" value="2">
+                        <button id="importData" class="btn btn-warning" onclick="importData()">Import Data</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div>
+                    <h2 id="deployedActionsHeader">Deployed Actions:</h2>
+                    <ul class="list-group" id="actionList"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-3">
+        <div class="row">
+            <div class="col-md-12">
+                <h3>@flamestro</h3>
+            </div>
+        </div>
+    </div>
+
+</div>
+</body>
+</html>
