@@ -340,7 +340,7 @@ def handle_content_data(first_line:str,
             sensor_idx   = sensor['idx']
             already_sent = sensor['sent_values']
             for yet_to_be_sent in split_by_already_sent(*chunks[sensor_id], iso_dates, already_sent):
-                for i, j in batchify(*yet_to_be_sent, max_batch_size=2000): # TODO(florian): Make this global
+                for i, j in batchify(*yet_to_be_sent, max_batch_size=2000): # TODO(florian): Make max_batch_size global?
                     _add_values(i=i, j=j, idx=idx, osn_id=osn_id)
                     t0 = time.time()
                     collection.update({"_id": 2}, {"$inc": {"aimedValueCount": len(messages)}}) # NOTE(florian): needed?
@@ -354,7 +354,10 @@ def handle_content_data(first_line:str,
                         collection.update({"_id": 2}, {"$inc": {"valueCount": len(messages)}}) # NOTE(florian): needed?
                         valuebulk['collapsedMessages'] = []
                         messages = valuebulk['collapsedMessages']
-                    else: continue
+                    else:
+                        valuebulk['collapsedMessages'] = []
+                        messages = valuebulk['collapsedMessages']
+                        continue
         mongo_merge_all_already_sent(local_id, time_class, collection)
 
     def _update(_measurand:str, _idx:int, _func:Callable):
