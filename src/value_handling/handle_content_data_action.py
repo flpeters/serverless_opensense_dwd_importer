@@ -157,6 +157,7 @@ def belongs_to_sensor(a:str, ts:str, b:str) -> bool:
 
 def find_transition(start:int, end:int, List:list, condition:Callable) -> int:
     """Uses a Binary Search approach to find the index of the first element where condition is no longer true."""
+    # NOTE(florian): The reason for using the first "wrong" element, is that slicing "[i:j]" excludes the j'th value.
     pivot = (start + end) // 2
     while end - start > 1:
         if condition(List[pivot]):
@@ -214,7 +215,8 @@ def _lies_within_iso_str(f:str, x:str, t:str) -> bool:
 
 def matcher_by_time_class(time_class:str) -> Callable: # TODO(florian): Add more time_classes
     return {'hourly' : _lies_within_iso_str}.get(time_class, None)
-# NOTE(florian): Using the default wont lead to wrong results, but it'll slow things down over time
+# NOTE(florian): Using _lies_within_strict as a default wont lead to wrong results, but it'll slow things down over time,
+# because more and more timestamps will accumulate in mongodb
 
 # TODO(florian): refactor this
 def merge_already_sent(sub_chunks:List[Tuple[Union[str, int]]],
@@ -236,24 +238,28 @@ def merge_already_sent(sub_chunks:List[Tuple[Union[str, int]]],
         return out_chunks
     else: return sub_chunks
     
-# TODO(florian): add short description
 def split_by_already_sent(start:int, end:int, timestamps:List[str], already_sent:List[Tuple[str]]) -> List[int]:
+    """Check which of the timestamps lie outside the ranges of the already_sent timestamps, and return them."""
+    # NOTE(florian): (end - 1) is used, because end is the first element that is NO LONGER PART OF the data, so we don't include it.
     if len(already_sent) > 0:
         yet_to_sent = []
-        for f, t in already_sent:
-            if timestamps[start] < f:
-                if f < timestamps[end - 1]:
-                    yet_to_sent.append((start, find_transition(start, end - 1, timestamps, lambda x: x < f)))
+        for a, b in already_sent:
+            if timestamps[start] < a: # is start before the start of the already_sent interval?
+                if a < timestamps[end - 1]: # is end after the start of the already_sent interval?
+                    # since both are true, there has to be a transition.
+                    yet_to_sent.append((start, find_transition(start, end - 1, timestamps, lambda x: x < a)))
                 else:
-                    yet_to_sent.append((start, end))
+                    yet_to_sent.append((start, end)) # no part of the data has been sent yet
                     break
-            else: pass
-            if timestamps[start] < t < timestamps[end - 1]:
-                start = find_transition(start, end - 1, timestamps, lambda x: x <= t)
+            else: pass # start has already been sent
+            
+            if timestamps[start] < b < timestamps[end - 1]:
+                # there is still data after this already_sent interval
+                start = find_transition(start, end - 1, timestamps, lambda x: x <= b)
             else:
-                if t < timestamps[end - 1]: continue
-                else: break
-        else:
+                if b < timestamps[end - 1]: continue # this already_sent interval is entirely before the data
+                else: break # subsequent already_sent intervals all come after this one chronologically
+        else: # the loop has run to completion, without hitting a break. check if there is still data left
             if start < end: yet_to_sent.append((start, end))
         return yet_to_sent
     else: return [(start, end)]
@@ -326,13 +332,11 @@ def handle_content_data(first_line:str,
                                  'timestamp': iso_date,
                                  'numberValue': value})
                 
-    def _process_chunks(idx:int, chunks:tuple, sensors:dict, local_id:str,
-                        _add_values:Callable, collection:Collection):
+    def _process_chunks(idx:int, chunks:tuple, sensors:dict, local_id:str, _add_values:Callable, collection:Collection):
         nonlocal valuebulk, messages, logged_action
         if not logged_action:
             collection.update({"_id": 5}, {"$inc": {"actionCount": 1}}) # NOTE(florian): needed?
             logged_action = True
-            
         print(chunks)
         for sensor_id in chunks:
             sensor       = sensors[sensor_id]
