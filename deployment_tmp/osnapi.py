@@ -18,7 +18,7 @@ Value = Measurand = Unit = Dict[str, Union[str, float]]
 License                  = Dict[str, Union[int, str, bool]]
 
 class Settings():
-    api_endpoint = 'https://www.opensense.network/beta/api/v1.0/'
+    api_endpoint = 'https://dep2.osn.k8s.ise-apps.de/api/v1.0'
     username     = None
     password     = None
     auth_token   = None
