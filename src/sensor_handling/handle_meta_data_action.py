@@ -56,6 +56,7 @@ api.getMeasurands = cache_result(retry(api.getMeasurands))
 api.getUnits      = cache_result(retry(api.getUnits))
 api.getLicenses   = cache_result(retry(api.getLicenses))
 api.addSensor     = retry(api.addSensor)
+api.login         = retry(api.login)
 
 
 ################## Opensense ################## 
