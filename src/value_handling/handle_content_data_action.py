@@ -51,25 +51,20 @@ def iso_to_int(iso_date:str):
     return int(f'{year}{month}{day}{hour}{minute}{second}')
 
 
+################## Monkey patching api calls ##################
+def _print_failure(e):
+    print(f'Failed request -> retrying\nfailure cause: ({e})')
+    return True
+retry = api.retry_on(EX=Exception, retries=3, on_failure=_print_failure)
+
+api.addMultipleValues = retry(api.addMultipleValues)
+api.login             = retry(api.login)
+
+
 ################## Opensense ##################
-# TODO(florian): This can be cleaned up due to changed to the api.
-def osn_push_valuebulk(valuebulk: dict) -> bool:
+def osn_push_valuebulk(valuebulk:dict) -> bool:
     try: return api.addMultipleValues(body=valuebulk) == 'OK'
-
-    except PermissionError as pe:
-        print(f'Failed pushing values once, due to permission error.\n\t--> sending login and retrying second time.')
-        try: api.login(username=secretmanager.__OSNUSERNAME__, password=secretmanager.__OSNPASSWORD__)
-        except Exception as e2: print(f'WARNING: Failed to log in ({e2}).\n\t--> Skipping values.')
-
-    except TimeoutError as te: print(f'Failed pushing values once, due to timeout error.\n\t--> retrying')
-    except Exception as e: print(f'Failed pushing values once, due to unhandled error.\n\t--> retrying')
-
-    for x in range(2, 5):
-        try: return api.addMultipleValues(body=valuebulk) == 'OK'
-        except Exception as e:
-            print(f'WARNING: Failed pushing values a {x}(nd/th) time of maximum 5 retries({e}).\n\t--> retrying.')
-
-    return False
+    except: return False
 
 
 ################## PyMongo ##################
@@ -390,10 +385,9 @@ def main(args):
     measurand = args.get("measurand", 'temperature')
     if csv is None: return {"error": "seuquence should be stopped"}
     try:
+        api.login(username=secretmanager.__OSNUSERNAME__, password=secretmanager.__OSNPASSWORD__)
         lines = csv.splitlines()
-        # first_line, lines = lines[0], lines[1:]
-        first_line = lines.pop(0)
-        lines.pop(0) # NOTE(florian): why pop(0) here? Above should work fine
+        first_line, lines = lines[0], lines[1:]
         handle_content_data(first_line=first_line, lines=lines)
     except Exception as e: print("Exception {}".format(e))
     finally: secretmanager.complete_sequence(rest_names)
