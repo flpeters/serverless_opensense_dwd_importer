@@ -5,6 +5,7 @@ __author__ = "Florian Peters https://github.com/flpeters"
 from contextlib import contextmanager
 from typing import List
 from datetime import datetime
+from time import time
 
 try: import osnapi as api
 except: import deployment_tmp.osnapi as api
@@ -23,6 +24,38 @@ mongo_db_url = secretmanager.__MONGOURL__
 def clean_str(line:str) -> List[str]: return ''.join(line.split()).split(';')
 
 def to_iso_date(timestamp:str, format:str) -> str: return datetime.strptime(timestamp, format).isoformat()
+
+def cache(timeout_ms=300_000):
+    class _cache:
+        def __init__(self, func):
+            self.func = func
+            self.ex_count = 0
+            self.res = None
+            self.t_last_exec = time()
+            self.timeout_sec = timeout_ms / 1000
+
+        def __call__(self, *args, **kwargs):
+            if ((time() - self.t_last_exec) > self.timeout_sec) or (self.res is None):
+                print(f'reload cache for: {self.func} count: {self.ex_count}')
+                self.res = self.func(*args, **kwargs)
+                self.t_last_exec = time()
+                self.ex_count += 1
+            return self.res
+    return _cache
+
+################## Monkey patching api calls ##################
+def _print_failure(e):
+    print(f'Failed request -> retrying\nfailure cause: ({e})')
+    return True
+
+retry = api.retry_on(EX=Exception, retries=3, on_failure=_print_failure)
+cache_result = cache(timeout_ms = 300_000) # 5 minute timeout
+
+# WARNING(florian): doing this multiple times with the same function would create wrappers around wrappers, recursively. 
+api.getMeasurands = cache_result(retry(api.getMeasurands))
+api.getUnits      = cache_result(retry(api.getUnits))
+api.getLicenses   = cache_result(retry(api.getLicenses))
+api.addSensor     = retry(api.addSensor)
 
 
 ################## Opensense ################## 
@@ -43,33 +76,6 @@ def make_sensor(measurandId, unitId, licenseId,
             'sensorModel': sensorModel,
             'attributionText': attributionText,
             'attributionURL': attributionURL}
-
-# TODO(florian): switch range to osnapi retry decorator
-def osn_measurands(measurand):
-    for x in range(2, 5):
-        try: return api.getMeasurands(name=measurand)[0]['id']
-        except: print(f'Failed to get measurands -> retrying {x}(nd/th) time')
-    raise Exception('couldnt communicate with api')
-
-def osn_unitId(unitString, measurandId):
-    for x in range(2, 5):
-        try: return api.getUnits(name=unitString, measurandId=measurandId)[0]['id']
-        except: print(f'Failed to get measurands -> retrying {x}(nd/th) time')
-    raise Exception('couldnt communicate with api')
-
-def osn_licenseId():
-    for x in range(2, 5):
-        try: return api.getLicenses(shortName='DE-GeoNutzV-1.0')[0]['id']
-        except: print(f'Failed to get measurands -> retrying {x}(nd/th) time')
-    raise Exception('couldnt communicate with api')
-    
-def osn_push_sensors(sensor):
-    for x in range(2, 5):
-        try:
-            api.login(username=secretmanager.__OSNUSERNAME__, password=secretmanager.__OSNPASSWORD__)
-            return api.addSensor(sensor)['id']
-        except: print(f'Failed to get measurands -> retrying {x}(nd/th) time')
-    raise Exception('couldnt communicate with api')
 
 
 ################## PyMongo ##################
@@ -140,9 +146,9 @@ def createLocalAndRemoteSensor(dwd_id:str, measurand:str,
 
             if unitString is None: raise Exception(f'Station {dwd_id} has no legit unit: {measurand} -> {unitString}')
 
-            measurandId = osn_measurands(measurand)
-            unitId = osn_unitId(unitString, measurandId)
-            licenseId = osn_licenseId()
+            measurandId = api.getMeasurands(name=measurand)[0]['id']
+            unitId = api.getUnits(name=unitString, measurandId=measurandId)[0]['id']
+            licenseId = api.getLicenses(shortName='DE-GeoNutzV-1.0')[0]['id']
 
             osn_sensor = make_sensor(measurandId=measurandId, unitId=unitId, licenseId=licenseId,
                                      latitude=latitude, longitude=longitude,
@@ -151,7 +157,7 @@ def createLocalAndRemoteSensor(dwd_id:str, measurand:str,
                                      attributionText='Deutscher Wetterdienst (DWD)',
                                      attributionURL='ftp://ftp-cdc.dwd.de/pub/CDC/')
 
-            osn_id = osn_push_sensors(osn_sensor)
+            osn_id = api.addSensor(osn_sensor)['id']
 
             if not osn_id: raise Exception(f'Station {dwd_id} failed to create new sensor')
             else:          print(f'Added Sensor with dwd_id: {dwd_id} -> osn_id: {osn_id}')
@@ -182,6 +188,7 @@ def createLocalAndRemoteSensor(dwd_id:str, measurand:str,
 
 def parse_metadata(content:str, measurand:str):
     date_format = '%Y%m%d'
+    api.login(username=secretmanager.__OSNUSERNAME__, password=secretmanager.__OSNPASSWORD__)
     for line in content.splitlines():
         line = clean_str(line)
         if len(line) < 7 or not line[0].isdigit(): continue
@@ -189,8 +196,8 @@ def parse_metadata(content:str, measurand:str):
         fromDate = to_iso_date(timestamp=fromDate, format=date_format)
         if toDate: toDate = to_iso_date(timestamp=toDate, format=date_format)
         createLocalAndRemoteSensor(stationID, measurand, fromDate, toDate, float(latitude), float(longitude))
-        
-        
+
+
 ##################### OpenWhisk Entrypoint #######################
 def main(args):
     filename = args.get('filename')
